@@ -1,0 +1,6 @@
+mode = "live"
+data_source = "live_stream"
+broker = "binance"
+live_orders_enabled = false
+explicit_approval_required = true
+

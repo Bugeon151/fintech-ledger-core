@@ -1,0 +1,4 @@
+mode = "research"
+data_source = "parquet"
+broker = "none"
+

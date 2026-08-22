@@ -1,0 +1,10 @@
+{
+  "maximum_signal_time_delta_seconds": 1.0,
+  "maximum_fill_time_delta_seconds": 3.0,
+  "maximum_slippage_delta_bps": 5.0,
+  "maximum_fee_delta_bps": 1.0,
+  "maximum_quantity_relative_delta": 0.01,
+  "maximum_missing_ratio": 0.01,
+  "maximum_status_mismatch_ratio": 0.01,
+  "maximum_reason_mismatch_ratio": 0.05
+}

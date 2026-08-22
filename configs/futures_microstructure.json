@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "feature_version": "futures-microstructure-v2",
+  "recent_trade_seconds": 10,
+  "baseline_trade_seconds": 300,
+  "oi_change_seconds": 300,
+  "oi_history_seconds": 3600,
+  "liquidation_seconds": 60,
+  "depth_levels": 5,
+  "trade_freshness_seconds": 2,
+  "oi_freshness_seconds": 10,
+  "liquidation_freshness_seconds": 2,
+  "depth_freshness_seconds": 1
+}

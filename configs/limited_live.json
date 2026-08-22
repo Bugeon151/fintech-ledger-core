@@ -1,0 +1,9 @@
+{
+  "maximum_evidence_age_seconds": 180.0,
+  "maximum_approval_age_seconds": 900.0,
+  "maximum_initial_capital": 1000.0,
+  "maximum_order_notional": 250.0,
+  "maximum_leverage": 1.0,
+  "maximum_daily_loss_ratio": 0.015,
+  "allowed_symbols": ["BTCUSDT"]
+}

@@ -1,0 +1,23 @@
+[strategy]
+name = "easc_lm"
+version = "1.1"
+prearm_ttl_seconds = 90
+trigger_ttl_seconds = 15
+pending_entry_timeout_seconds = 3
+cooldown_win_seconds = 60
+cooldown_loss_seconds = 300
+
+[risk]
+risk_per_trade = 0.003
+max_leverage = 2.0
+daily_loss_limit = 0.015
+max_consecutive_losses = 3
+max_notional = 100000.0
+
+[execution]
+fee_rate = 0.0005
+slippage_bps = 2.0
+tick_size = 0.1
+step_size = 0.001
+minimum_quantity = 0.001
+minimum_notional = 100.0

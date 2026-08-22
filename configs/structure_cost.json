@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "feature_version": "structure-cost-hypothesis-v1",
+  "bar_seconds": 60,
+  "structure_seconds": 300,
+  "atr_periods": 14,
+  "breakout_buffer_bps": 0.0,
+  "breakout_persistence_seconds": 2,
+  "atr_stop_multiple": 1.5,
+  "stop_structure_buffer_bps": 2.0,
+  "take_profit_r_multiple": 2.0,
+  "slippage_probe_notional": 1000.0,
+  "fee_bps_per_side": 5.0,
+  "trade_freshness_seconds": 2,
+  "depth_freshness_seconds": 1
+}

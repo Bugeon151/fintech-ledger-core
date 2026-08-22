@@ -1,0 +1,8 @@
+risk_per_trade = 0.003
+max_leverage = 2.0
+daily_loss_limit = 0.015
+max_consecutive_losses = 3
+drawdown_warning = 0.05
+drawdown_reduce = 0.08
+drawdown_block = 0.12
+

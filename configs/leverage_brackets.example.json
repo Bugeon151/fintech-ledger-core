@@ -1,0 +1,20 @@
+{
+  "schema_version": "1",
+  "status": "EXAMPLE_ONLY_REPLACE_WITH_VERSIONED_VENUE_RULES",
+  "brackets": [
+    {
+      "bracket_id": "example-tier-1",
+      "notional_cap": 50000,
+      "maximum_leverage": 10,
+      "maintenance_margin_rate": 0.005,
+      "maintenance_amount": 0
+    },
+    {
+      "bracket_id": "example-tier-2",
+      "notional_cap": 250000,
+      "maximum_leverage": 5,
+      "maintenance_margin_rate": 0.01,
+      "maintenance_amount": 250
+    }
+  ]
+}
