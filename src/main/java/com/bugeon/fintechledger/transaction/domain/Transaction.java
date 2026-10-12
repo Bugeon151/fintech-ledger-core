@@ -1,6 +1,8 @@
 package com.bugeon.fintechledger.transaction.domain;
 
 import com.bugeon.fintechledger.common.domain.BaseEntity;
+import com.bugeon.fintechledger.common.exception.ErrorCode;
+import com.bugeon.fintechledger.common.json.Json;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -8,19 +10,19 @@ import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
  * Money-movement command aggregate.
  *
- * Status FSM:
- *   PENDING ──► PROCESSING ──► SUCCESS
- *                           └──► FAILED
- *          └──► CANCELED
+ * Lifecycle: a row is only ever committed as SUCCESS (inserted PENDING and completed in the
+ * same database transaction as its ledger legs) or FAILED (recorded after the business
+ * transaction rolled back). PROCESSING / CANCELED remain valid in the schema for legacy rows.
  *
- * Immutable after reaching a terminal state (SUCCESS, FAILED, CANCELED).
- * idempotency_key is the deduplication anchor — unique per request.
- * request_payload (JSONB) stores the original request for full auditability.
+ * (requested_by, idempotency_key) is the deduplication anchor.
+ * request_payload (JSONB) stores the original command for auditability.
  */
 @Entity
 @Table(name = "transactions")
@@ -35,7 +37,8 @@ public class Transaction extends BaseEntity {
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
-    @Column(name = "idempotency_key", nullable = false, unique = true, length = 64, updatable = false)
+    /** Unique per requester (constraint uq_transactions_requester_idem_key). */
+    @Column(name = "idempotency_key", nullable = false, length = 64, updatable = false)
     private String idempotencyKey;
 
     /** 요청을 발행한 사용자. Idempotency-Key 결과 조회의 소유권 기준. */
@@ -65,6 +68,9 @@ public class Transaction extends BaseEntity {
     @Column(name = "description", length = 255)
     private String description;
 
+    @Column(name = "failure_code", length = 50)
+    private String failureCode;
+
     @Column(name = "failure_reason", length = 500)
     private String failureReason;
 
@@ -77,83 +83,47 @@ public class Transaction extends BaseEntity {
 
     // ── Factories ─────────────────────────────────────────────────────────────
 
-    public static Transaction createDeposit(String idempotencyKey,
-                                            UUID requestedBy,
-                                            UUID targetAccountId,
-                                            BigDecimal amount,
-                                            String currency,
-                                            String description) {
-        return build(idempotencyKey, requestedBy, TransactionType.DEPOSIT,
-                null, targetAccountId, amount, currency, description);
-    }
-
-    public static Transaction createWithdrawal(String idempotencyKey,
-                                               UUID requestedBy,
-                                               UUID sourceAccountId,
-                                               BigDecimal amount,
-                                               String currency,
-                                               String description) {
-        return build(idempotencyKey, requestedBy, TransactionType.WITHDRAWAL,
-                sourceAccountId, null, amount, currency, description);
-    }
-
-    public static Transaction createTransfer(String idempotencyKey,
-                                             UUID requestedBy,
-                                             UUID sourceAccountId,
-                                             UUID targetAccountId,
-                                             BigDecimal amount,
-                                             String currency,
-                                             String description) {
-        return build(idempotencyKey, requestedBy, TransactionType.TRANSFER,
-                sourceAccountId, targetAccountId, amount, currency, description);
-    }
-
-    private static Transaction build(String idempotencyKey, UUID requestedBy,
-                                     TransactionType type,
-                                     UUID sourceAccountId, UUID targetAccountId,
-                                     BigDecimal amount, String currency, String description) {
+    public static Transaction pending(String idempotencyKey, UUID requestedBy, MoneyCommand command) {
         Transaction tx = new Transaction();
         tx.idempotencyKey  = idempotencyKey;
         tx.requestedBy     = requestedBy;
-        tx.type            = type;
+        tx.type            = command.type();
         tx.status          = TransactionStatus.PENDING;
-        tx.sourceAccountId = sourceAccountId;
-        tx.targetAccountId = targetAccountId;
-        tx.amount          = amount;
-        tx.currency        = currency;
-        tx.description     = description;
+        tx.sourceAccountId = command.sourceAccountId();
+        tx.targetAccountId = command.targetAccountId();
+        tx.amount          = command.amount();
+        tx.currency        = command.currency();
+        tx.description     = command.description();
+        tx.requestPayload  = Json.write(command);
+        return tx;
+    }
+
+    /** A business rejection, persisted so that a retry with the same key replays the same error. */
+    public static Transaction failed(String idempotencyKey, UUID requestedBy, MoneyCommand command,
+                                     ErrorCode code, String reason) {
+        Transaction tx = pending(idempotencyKey, requestedBy, command);
+        tx.status        = TransactionStatus.FAILED;
+        tx.failureCode   = code.name();
+        tx.failureReason = reason == null ? null : reason.substring(0, Math.min(reason.length(), 500));
+        tx.completedAt   = Instant.now();
         return tx;
     }
 
     // ── Status transitions ────────────────────────────────────────────────────
 
-    public void markProcessing() {
-        this.status = TransactionStatus.PROCESSING;
-    }
-
     public void markSuccess() {
+        if (status != TransactionStatus.PENDING) {
+            throw new IllegalStateException("Only a PENDING transaction can succeed, was " + status);
+        }
         this.status      = TransactionStatus.SUCCESS;
         this.completedAt = Instant.now();
     }
 
-    public void markFailed(String reason) {
-        this.status        = TransactionStatus.FAILED;
-        this.failureReason = reason;
-        this.completedAt   = Instant.now();
-    }
-
-    public void markCanceled() {
-        this.status      = TransactionStatus.CANCELED;
-        this.completedAt = Instant.now();
-    }
-
-    public boolean isTerminal() {
-        return this.status == TransactionStatus.SUCCESS
-            || this.status == TransactionStatus.FAILED
-            || this.status == TransactionStatus.CANCELED;
-    }
-
-    public void attachRequestPayload(String payloadJson) {
-        this.requestPayload = payloadJson;
+    /** The original business error of a FAILED transaction, if it was recorded with one. */
+    public Optional<ErrorCode> failureErrorCode() {
+        if (status != TransactionStatus.FAILED || failureCode == null) {
+            return Optional.empty();
+        }
+        return Arrays.stream(ErrorCode.values()).filter(c -> c.name().equals(failureCode)).findFirst();
     }
 }

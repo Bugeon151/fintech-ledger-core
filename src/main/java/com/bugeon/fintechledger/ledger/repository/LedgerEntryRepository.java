@@ -9,40 +9,33 @@ import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 public interface LedgerEntryRepository extends JpaRepository<LedgerEntry, UUID> {
 
-    List<LedgerEntry> findAllByTransactionIdOrderByCreatedAtAsc(UUID transactionId);
+    List<LedgerEntry> findAllByTransactionIdOrderByEntryTypeAsc(UUID transactionId);
 
     Page<LedgerEntry> findAllByAccountIdOrderByCreatedAtDesc(UUID accountId, Pageable pageable);
 
-    /**
-     * Authoritative balance derived from the ledger.
-     * CREDIT = +amount, DEBIT = -amount.
-     * Used by ReconciliationService to compare against Account.cachedBalance.
-     */
-    @Query("""
-        SELECT COALESCE(
-            SUM(CASE WHEN le.entryType = 'CREDIT' THEN le.amount ELSE -le.amount END),
-            0
-        )
-        FROM LedgerEntry le
-        WHERE le.accountId = :accountId
-        """)
+    /** Authoritative balance of one account: SUM(CREDIT) - SUM(DEBIT). */
+    @Query(value = """
+            SELECT COALESCE(SUM(CASE entry_type WHEN 'CREDIT' THEN amount ELSE -amount END), 0)
+            FROM ledger_entries
+            WHERE account_id = :accountId
+            """, nativeQuery = true)
     BigDecimal calculateLedgerBalance(@Param("accountId") UUID accountId);
 
-    /**
-     * Returns the latest running_balance for an account.
-     * Used when computing runningBalance for the next entry to insert.
-     */
-    @Query("""
-        SELECT le.runningBalance
-        FROM LedgerEntry le
-        WHERE le.accountId = :accountId
-        ORDER BY le.createdAt DESC
-        LIMIT 1
-        """)
-    Optional<BigDecimal> findLatestRunningBalance(@Param("accountId") UUID accountId);
+    /** Net of all legs per currency. Double-entry requires every value to be zero. */
+    @Query(value = """
+            SELECT currency AS currency,
+                   SUM(CASE entry_type WHEN 'CREDIT' THEN amount ELSE -amount END) AS net
+            FROM ledger_entries
+            GROUP BY currency
+            """, nativeQuery = true)
+    List<CurrencyNet> netByCurrency();
+
+    interface CurrencyNet {
+        String getCurrency();
+        BigDecimal getNet();
+    }
 }

@@ -1,7 +1,9 @@
 package com.bugeon.fintechledger.account.repository;
 
 import com.bugeon.fintechledger.account.domain.Account;
+import com.bugeon.fintechledger.account.domain.AccountType;
 import jakarta.persistence.LockModeType;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -18,6 +20,14 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
     Optional<Account> findByAccountNumber(String accountNumber);
 
     boolean existsByAccountNumber(String accountNumber);
+
+    /** Keyset page of account ids (stable while accounts are being created, unlike offset paging). */
+    @Query("SELECT a.id FROM Account a WHERE a.id > :after ORDER BY a.id")
+    List<UUID> findIdsAfter(@Param("after") UUID after, Pageable page);
+
+    /** Scalar lookup on purpose: loading the entity here would make a later FOR UPDATE return stale state. */
+    @Query("SELECT a.id FROM Account a WHERE a.accountType = :type AND a.currency = :currency")
+    Optional<UUID> findIdByTypeAndCurrency(@Param("type") AccountType type, @Param("currency") String currency);
 
     /**
      * Acquires a DB-level exclusive lock (SELECT ... FOR UPDATE).

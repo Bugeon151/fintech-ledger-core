@@ -11,6 +11,7 @@ import com.bugeon.fintechledger.audit.service.AuditService;
 import com.bugeon.fintechledger.auth.security.UserPrincipal;
 import com.bugeon.fintechledger.common.exception.BusinessException;
 import com.bugeon.fintechledger.common.exception.ErrorCode;
+import com.bugeon.fintechledger.common.json.Json;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,8 +43,7 @@ public class AccountService {
         auditService.logSuccess(AuditAction.ACCOUNT_CREATED,
                 principal.getUserId(), principal.getEmail(),
                 "ACCOUNT", account.getId(),
-                String.format("{\"accountNumber\":\"%s\",\"currency\":\"%s\"}",
-                        accountNumber, account.getCurrency()));
+                Json.of("accountNumber", accountNumber, "currency", account.getCurrency()));
 
         log.info("Account created: number={}, userId={}", accountNumber, principal.getUserId());
         return AccountResponse.from(account);
@@ -88,7 +88,7 @@ public class AccountService {
         auditService.logSuccess(AuditAction.ACCOUNT_FROZEN,
                 principal.getUserId(), principal.getEmail(),
                 "ACCOUNT", account.getId(),
-                String.format("{\"accountNumber\":\"%s\"}", account.getAccountNumber()));
+                Json.of("accountNumber", account.getAccountNumber()));
 
         log.info("Account frozen: id={}", account.getId());
         return AccountResponse.from(account);
@@ -111,7 +111,7 @@ public class AccountService {
         auditService.logSuccess(AuditAction.ACCOUNT_UNFROZEN,
                 principal.getUserId(), principal.getEmail(),
                 "ACCOUNT", account.getId(),
-                String.format("{\"accountNumber\":\"%s\"}", account.getAccountNumber()));
+                Json.of("accountNumber", account.getAccountNumber()));
 
         log.info("Account unfrozen: id={}", account.getId());
         return AccountResponse.from(account);
@@ -138,7 +138,7 @@ public class AccountService {
         auditService.logSuccess(AuditAction.ACCOUNT_CLOSED,
                 principal.getUserId(), principal.getEmail(),
                 "ACCOUNT", account.getId(),
-                String.format("{\"accountNumber\":\"%s\"}", account.getAccountNumber()));
+                Json.of("accountNumber", account.getAccountNumber()));
 
         log.info("Account closed: id={}", account.getId());
         return AccountResponse.from(account);

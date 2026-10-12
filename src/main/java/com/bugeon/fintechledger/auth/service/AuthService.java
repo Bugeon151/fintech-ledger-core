@@ -9,6 +9,7 @@ import com.bugeon.fintechledger.auth.security.JwtTokenProvider;
 import com.bugeon.fintechledger.auth.security.UserPrincipal;
 import com.bugeon.fintechledger.common.exception.BusinessException;
 import com.bugeon.fintechledger.common.exception.ErrorCode;
+import com.bugeon.fintechledger.common.json.Json;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -48,7 +49,7 @@ public class AuthService {
         // Audit: SIGNUP (REQUIRES_NEW — 비즈니스 TX 커밋 후 별도 커밋)
         auditService.logSuccess(AuditAction.SIGNUP, user.getId(), email,
                 "USER", user.getId(),
-                String.format("{\"email\":\"%s\"}", email));
+                Json.of("email", email));
 
         log.info("Signup: new user registered [email={}]", email);
         return SignupResponse.from(user);
@@ -67,7 +68,7 @@ public class AuthService {
             UUID actorId = (user != null) ? user.getId() : null;
             auditService.logFailure(AuditAction.LOGIN_FAILED, actorId, email,
                     "USER", actorId,
-                    String.format("{\"reason\":\"invalid_credentials\",\"email\":\"%s\"}", email));
+                    Json.of("reason", "invalid_credentials", "email", email));
             log.warn("Login failed [email={}]", email);
             throw new BusinessException(ErrorCode.INVALID_CREDENTIALS);
         }
@@ -86,7 +87,7 @@ public class AuthService {
         // Audit: LOGIN 성공
         auditService.logSuccess(AuditAction.LOGIN, user.getId(), email,
                 "USER", user.getId(),
-                String.format("{\"email\":\"%s\"}", email));
+                Json.of("email", email));
 
         log.info("Login: user authenticated [email={}]", email);
         return TokenResponse.of(accessToken, refreshToken, jwtTokenProvider.getAccessExpiryMs());
@@ -94,7 +95,7 @@ public class AuthService {
 
     // ── Refresh ───────────────────────────────────────────────────────────────
 
-    @Transactional
+    @Transactional(noRollbackFor = BusinessException.class)
     public TokenResponse refresh(RefreshTokenRequest request) {
         UUID userId = refreshTokenService.validateAndRotate(request.refreshToken());
 

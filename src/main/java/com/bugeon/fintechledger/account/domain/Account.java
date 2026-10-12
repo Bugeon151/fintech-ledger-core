@@ -50,6 +50,10 @@ public class Account extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private AccountStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_type", nullable = false, length = 20, updatable = false)
+    private AccountType accountType;
+
     @Column(name = "cached_balance", nullable = false, precision = 19, scale = 2)
     private BigDecimal cachedBalance;
 
@@ -67,6 +71,7 @@ public class Account extends BaseEntity {
         acc.accountName   = accountName;
         acc.currency      = currency;
         acc.status        = AccountStatus.ACTIVE;
+        acc.accountType   = AccountType.CUSTOMER;
         acc.cachedBalance = BigDecimal.ZERO;
         return acc;
     }
@@ -94,9 +99,14 @@ public class Account extends BaseEntity {
         this.cachedBalance = this.cachedBalance.add(amount);
     }
 
+    public boolean isSettlement() {
+        return this.accountType == AccountType.SETTLEMENT;
+    }
+
+    /** Settlement accounts mirror external money and may go negative; customer accounts may not. */
     public void decreaseCachedBalance(BigDecimal amount) {
         BigDecimal result = this.cachedBalance.subtract(amount);
-        if (result.compareTo(BigDecimal.ZERO) < 0) {
+        if (!isSettlement() && result.signum() < 0) {
             throw new BusinessException(ErrorCode.INSUFFICIENT_FUNDS);
         }
         this.cachedBalance = result;
