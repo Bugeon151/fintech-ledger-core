@@ -11,15 +11,8 @@ spring:
       minimum-idle: 10
       connection-timeout: 20000
 
-  data:
-    redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT}
-      password: ${REDIS_PASSWORD}
-      lettuce:
-        pool:
-          max-active: 32
-          max-idle: 16
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
 
   jpa:
     show-sql: false
@@ -46,9 +39,14 @@ management:
     health:
       show-details: never
 
+outbox:
+  publisher: kafka
+
 springdoc:
   swagger-ui:
     enabled: false  # disable Swagger UI in production
+  api-docs:
+    enabled: false
 
 logging:
   level:
