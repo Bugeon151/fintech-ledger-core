@@ -45,15 +45,13 @@ public enum ErrorCode {
 
     // ── Transaction ───────────────────────────────────────────────────────────
     INSUFFICIENT_FUNDS      (HttpStatus.UNPROCESSABLE_ENTITY,   "TXN_001",  "Insufficient funds"),
-    SAME_ACCOUNT_TRANSFER   (HttpStatus.BAD_REQUEST,            "TXN_002",  "Cannot transfer to the same account"),
     TRANSACTION_NOT_FOUND   (HttpStatus.NOT_FOUND,              "TXN_003",  "Transaction not found"),
-    INVALID_AMOUNT          (HttpStatus.BAD_REQUEST,            "TXN_004",  "Amount must be greater than zero"),
+    TRANSACTION_FAILED      (HttpStatus.UNPROCESSABLE_ENTITY,   "TXN_007",  "The original request with this Idempotency-Key failed"),
+    INVALID_AMOUNT          (HttpStatus.BAD_REQUEST,            "TXN_004",  "Amount must be positive and fit the currency's minor unit"),
     SELF_TRANSFER_NOT_ALLOWED (HttpStatus.BAD_REQUEST,          "TXN_005",  "Cannot transfer to the same account"),
     CURRENCY_MISMATCH         (HttpStatus.BAD_REQUEST,          "TXN_006",  "Transaction currency does not match account currency"),
-    IDEMPOTENCY_DUPLICATE     (HttpStatus.OK,                   "TXN_007",  "Duplicate request — returning existing result"),
 
     // ── Ledger ────────────────────────────────────────────────────────────────
-    LEDGER_INVARIANT_VIOLATED (HttpStatus.INTERNAL_SERVER_ERROR, "LDG_001", "Ledger double-entry invariant violated"),
 
     // ── Idempotency ───────────────────────────────────────────────────────────
     IDEMPOTENCY_KEY_MISSING  (HttpStatus.BAD_REQUEST,            "IDMP_001", "Idempotency-Key header is required"),
@@ -62,7 +60,8 @@ public enum ErrorCode {
 
     // ── General ───────────────────────────────────────────────────────────────
     VALIDATION_ERROR         (HttpStatus.BAD_REQUEST,            "GEN_001",  "Request validation failed"),
-    INTERNAL_SERVER_ERROR    (HttpStatus.INTERNAL_SERVER_ERROR,  "GEN_002",  "An unexpected error occurred");
+    INTERNAL_SERVER_ERROR    (HttpStatus.INTERNAL_SERVER_ERROR,  "GEN_002",  "An unexpected error occurred"),
+    DATA_CONFLICT            (HttpStatus.CONFLICT,               "GEN_003",  "Request conflicts with the current state of the resource");
 
     private final HttpStatus httpStatus;
     private final String     code;

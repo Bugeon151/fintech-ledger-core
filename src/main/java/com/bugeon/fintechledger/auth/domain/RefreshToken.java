@@ -54,6 +54,10 @@ public class RefreshToken {
     @Column(name = "revoked", nullable = false)
     private boolean revoked;
 
+    /** Set when the token was consumed by rotation; presenting it again signals a leaked token. */
+    @Column(name = "rotated_at")
+    private Instant rotatedAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

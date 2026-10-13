@@ -1,10 +1,19 @@
 package com.bugeon.fintechledger.common.exception;
 
+import com.bugeon.fintechledger.common.persistence.Constraints;
 import com.bugeon.fintechledger.common.web.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.mapping.PropertyReferenceException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import org.springframework.dao.PessimisticLockingFailureException;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.ErrorResponse;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
@@ -197,33 +206,54 @@ public class GlobalExceptionHandler {
                 )));
     }
 
-    // ── DB Constraint Violation — Idempotency duplicate ─────────────────────
-    //
-    // Scenario: Two concurrent requests with the same Idempotency-Key both pass
-    // the findByIdempotencyKey() check (both see empty), then race to INSERT.
-    // The DB UNIQUE constraint on idempotency_key rejects the second INSERT with
-    // DataIntegrityViolationException. We catch it here and return the existing
-    // transaction instead of a 500 error.
+    // ── Invalid sort property (e.g. ?sort=password) ──────────────────────────
 
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException ex) {
-        String msg = ex.getMostSpecificCause().getMessage();
-        log.warn("DataIntegrityViolation — likely duplicate idempotency key: {}", msg);
-
-        // Return 409 Conflict. The client should use
-        // GET /api/v1/transactions/by-idempotency-key/{key} to retrieve the
-        // result of the already-processed request (C-7).
-        ErrorCode code = ErrorCode.IDEMPOTENCY_KEY_CONFLICT;
+    @ExceptionHandler(PropertyReferenceException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBadSort(PropertyReferenceException ex) {
+        ErrorCode code = ErrorCode.VALIDATION_ERROR;
         return ResponseEntity
                 .status(code.getHttpStatus())
                 .body(ApiResponse.fail(new ApiResponse.Error(
-                        code.getCode(),
-                        "Duplicate request detected. The original request is being or has been processed.",
-                        null
-                )));
+                        code.getCode(), "Unknown sort property '" + ex.getPropertyName() + "'", null)));
     }
 
-    // ── Catch-all ─────────────────────────────────────────────────────────────
+    // ── DB constraint violations ─────────────────────────────────────────────
+    // Duplicate idempotency keys are resolved (replayed) inside TransactionService,
+    // so anything reaching this handler is a genuine conflict with stored state.
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException ex) {
+        log.warn("Data integrity violation: {}", ex.getMostSpecificCause().getMessage());
+        ErrorCode code = Constraints.isViolation(ex, Constraints.TRANSACTION_IDEMPOTENCY_KEY)
+                ? ErrorCode.IDEMPOTENCY_KEY_CONFLICT
+                : ErrorCode.DATA_CONFLICT;
+        return ResponseEntity
+                .status(code.getHttpStatus())
+                .body(ApiResponse.fail(new ApiResponse.Error(code.getCode(), code.getDefaultMessage(), null)));
+    }
+
+    // ── Lock timeout / deadlock victim — safe to retry ───────────────────────
+
+    @ExceptionHandler(PessimisticLockingFailureException.class)
+    public ResponseEntity<ApiResponse<Void>> handleLockFailure(PessimisticLockingFailureException ex) {
+        log.warn("Pessimistic locking failure: {}", ex.getMostSpecificCause().getMessage());
+        ErrorCode code = ErrorCode.CONCURRENT_MODIFICATION;
+        return ResponseEntity
+                .status(code.getHttpStatus())
+                .body(ApiResponse.fail(new ApiResponse.Error(code.getCode(), code.getDefaultMessage(), null)));
+    }
+
+    // ── Framework errors that carry their own status (404, 405, 415, ...) ────
+
+    @ExceptionHandler({NoResourceFoundException.class, HttpRequestMethodNotSupportedException.class,
+                       HttpMediaTypeNotSupportedException.class, HttpMediaTypeNotAcceptableException.class})
+    public ResponseEntity<ApiResponse<Void>> handleFrameworkError(Exception ex) {
+        HttpStatusCode status = ((ErrorResponse) ex).getStatusCode();
+        return ResponseEntity
+                .status(status)
+                .body(ApiResponse.fail(new ApiResponse.Error("GEN_" + status.value(),
+                        ((ErrorResponse) ex).getBody().getTitle(), null)));
+    }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleUnexpected(Exception ex) {

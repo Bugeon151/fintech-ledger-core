@@ -8,36 +8,24 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
 
-    Optional<Transaction> findByIdempotencyKey(String idempotencyKey);
-
-    /**
-     * Idempotency-Key + 발신 사용자 기준 조회.
-     * 키 결과를 조회하는 호출자가 원래 요청자임을 보장하기 위함.
-     */
     Optional<Transaction> findByIdempotencyKeyAndRequestedBy(String idempotencyKey, UUID requestedBy);
 
     /**
-     * Full history page for a user: transactions where any of their accounts
-     * appears as source or target.
+     * Account history as seen by {@code viewerId}: every successful movement on the account,
+     * plus the viewer's own failed attempts (a recipient never sees someone else's failure).
      */
     @Query("""
-        SELECT t FROM Transaction t
-        WHERE t.sourceAccountId IN :accountIds
-           OR t.targetAccountId IN :accountIds
-        ORDER BY t.createdAt DESC
-        """)
-    Page<Transaction> findAllByAccountIds(@Param("accountIds") List<UUID> accountIds,
-                                          Pageable pageable);
-
-    Page<Transaction> findAllBySourceAccountIdOrderByCreatedAtDesc(UUID accountId, Pageable pageable);
-
-    Page<Transaction> findAllByTargetAccountIdOrderByCreatedAtDesc(UUID accountId, Pageable pageable);
-
-    long countBySourceAccountIdAndStatus(UUID accountId, TransactionStatus status);
+            SELECT t FROM Transaction t
+            WHERE (t.sourceAccountId = :accountId OR t.targetAccountId = :accountId)
+              AND (t.status = :visibleStatus OR t.requestedBy = :viewerId)
+            """)
+    Page<Transaction> findHistory(@Param("accountId") UUID accountId,
+                                  @Param("viewerId") UUID viewerId,
+                                  @Param("visibleStatus") TransactionStatus visibleStatus,
+                                  Pageable pageable);
 }

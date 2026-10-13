@@ -6,6 +6,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 /**
@@ -14,11 +15,9 @@ import java.util.UUID;
  * Written within the SAME DB transaction as domain changes — eliminates
  * the dual-write problem and guarantees at-least-once event delivery.
  *
- * OutboxProcessor polls PENDING rows with FOR UPDATE SKIP LOCKED,
- * preventing concurrent processing across multiple app instances.
- *
- * Future: replace in-process event publishing with Kafka producer
- * in OutboxProcessor without any schema or entity changes.
+ * OutboxProcessor claims due PENDING rows with FOR UPDATE SKIP LOCKED (safe across
+ * instances), publishes them to the broker, then marks them SENT or reschedules them.
+ * Consumers must de-duplicate on the event id (sent as a Kafka header).
  */
 @Entity
 @Table(name = "outbox_events")
@@ -58,6 +57,9 @@ public class OutboxEvent {
     @Column(name = "scheduled_at", nullable = false)
     private Instant scheduledAt;
 
+    @Column(name = "claimed_at")
+    private Instant claimedAt;
+
     @Column(name = "processed_at")
     private Instant processedAt;
 
@@ -82,23 +84,9 @@ public class OutboxEvent {
 
     // ── State transitions ─────────────────────────────────────────────────────
 
-    public void markProcessing() {
-        this.status = EventStatus.PROCESSING;
-    }
-
-    public void markSent() {
-        this.status      = EventStatus.SENT;
-        this.processedAt = Instant.now();
-    }
-
-    public void markFailedAndReschedule(Instant nextAttempt) {
-        this.retryCount++;
-        this.status      = EventStatus.PENDING;
-        this.scheduledAt = nextAttempt;
-    }
-
-    public void markPermanentlyFailed() {
-        this.retryCount++;
-        this.status = EventStatus.FAILED;
+    /** Claim timestamps are truncated to the database precision so they can be compared after a round trip. */
+    public void markProcessing(Instant claimedAt) {
+        this.status    = EventStatus.PROCESSING;
+        this.claimedAt = claimedAt.truncatedTo(ChronoUnit.MICROS);
     }
 }

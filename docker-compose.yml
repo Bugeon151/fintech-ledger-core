@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
 
   # ── PostgreSQL ───────────────────────────────────────────────────────────────
@@ -22,26 +20,33 @@ services:
       retries: 5
       start_period: 10s
 
-  # ── Redis ────────────────────────────────────────────────────────────────────
-  redis:
-    image: redis:7-alpine
-    container_name: fintech-redis
+  # ── Kafka (KRaft, single node) — outbox relay target ─────────────────────────
+  # Containers reach it at kafka:9092, the host at localhost:29092.
+  kafka:
+    image: apache/kafka:3.8.0
+    container_name: fintech-kafka
     restart: unless-stopped
-    command: >
-      redis-server
-      --requirepass ${REDIS_PASSWORD}
-      --maxmemory 256mb
-      --maxmemory-policy allkeys-lru
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,PLAINTEXT_HOST://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
     ports:
-      - "${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis_data:/data
+      - "${KAFKA_HOST_PORT:-29092}:29092"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
       interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 20s
 
   # ── Application (optional — enable with --profile full) ──────────────────────
   app:
@@ -53,18 +58,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      kafka:
         condition: service_healthy
     environment:
-      SPRING_PROFILES_ACTIVE:  docker
       POSTGRES_HOST:     postgres
       POSTGRES_PORT:     5432
       POSTGRES_DB:       ${POSTGRES_DB}
       POSTGRES_USER:     ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      REDIS_HOST:        redis
-      REDIS_PORT:        6379
-      REDIS_PASSWORD:    ${REDIS_PASSWORD}
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      OUTBOX_PUBLISHER:  kafka
       JWT_SECRET:        ${JWT_SECRET}
       JWT_ACCESS_EXPIRY_MS:  ${JWT_ACCESS_EXPIRY_MS:-900000}
       JWT_REFRESH_EXPIRY_MS: ${JWT_REFRESH_EXPIRY_MS:-604800000}
@@ -75,4 +78,3 @@ services:
 
 volumes:
   postgres_data:
-  redis_data:

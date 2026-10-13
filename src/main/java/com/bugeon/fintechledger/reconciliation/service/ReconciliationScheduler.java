@@ -39,9 +39,9 @@ public class ReconciliationScheduler {
 
             if (report.hasDiscrepancies()) {
                 // 운영 알람 연동 지점 — PagerDuty, Slack, OpsGenie 등
-                log.error("RECONCILIATION ALERT: {} discrepant account(s) found. " +
-                                "Immediate investigation required.",
-                        report.discrepantAccounts());
+                log.error("RECONCILIATION ALERT: {} discrepant account(s), unbalanced currencies={}. "
+                                + "Immediate investigation required.",
+                        report.discrepantAccounts(), report.unbalancedCurrencies());
             } else {
                 log.info("Daily reconciliation PASSED: {} accounts checked, all balanced.",
                         report.totalAccounts());

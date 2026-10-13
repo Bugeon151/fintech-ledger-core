@@ -17,7 +17,10 @@ public record TransactionResponse(
         BigDecimal        amount,
         String            currency,
         String            description,
-        Instant           createdAt
+        String            failureCode,
+        String            failureReason,
+        Instant           createdAt,
+        Instant           completedAt
 ) {
     public static TransactionResponse from(Transaction tx) {
         return new TransactionResponse(
@@ -29,7 +32,10 @@ public record TransactionResponse(
                 tx.getAmount(),
                 tx.getCurrency(),
                 tx.getDescription(),
-                tx.getCreatedAt()
+                tx.getFailureCode(),
+                tx.getFailureReason(),
+                tx.getCreatedAt(),
+                tx.getCompletedAt()
         );
     }
 }

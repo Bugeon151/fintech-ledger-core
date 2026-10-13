@@ -1,0 +1,16 @@
+jwt:
+  secret: test-secret-key-for-tests-only-must-be-at-least-32-characters-long
+  access-expiry-ms: 900000
+  refresh-expiry-ms: 604800000
+
+app:
+  scheduling:
+    enabled: false        # tests drive the outbox relay / reconciliation explicitly
+
+outbox:
+  publisher: log
+
+logging:
+  level:
+    root: WARN
+    com.bugeon.fintechledger: INFO

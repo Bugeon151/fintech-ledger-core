@@ -18,8 +18,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -51,13 +52,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * ── 왜 수정 후 통과하는가 ──────────────────────────────────────────────────────
  *
- * @MockBean JwtTokenProvider:
+ * @MockitoBean JwtTokenProvider:
  *   JwtProperties 없이도 JwtTokenProvider 빈이 mock으로 등록된다.
  *   JwtAuthenticationFilter는 mock JwtTokenProvider를 주입받아 정상 생성된다.
  *   SecurityConfig는 실제 JwtAuthenticationFilter 빈을 addFilterBefore()에 등록한다.
  *   (mock 필터가 아닌 실제 필터이므로 IllegalArgumentException 없음)
  *
- * @MockBean CustomUserDetailsService:
+ * @MockitoBean CustomUserDetailsService:
  *   JwtAuthenticationFilter의 두 번째 의존성인 CustomUserDetailsService(@Service)는
  *   @WebMvcTest에서 로드되지 않는다.
  *   Mock이 CustomUserDetailsService 타입과 UserDetailsService 인터페이스 양쪽에
@@ -69,13 +70,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *   user() post-processor로 @AuthenticationPrincipal을 직접 주입한다.
  */
 @WebMvcTest(AccountController.class)
+@ActiveProfiles("test")
 @AutoConfigureMockMvc(addFilters = false)
 @DisplayName("AccountController")
 class AccountControllerTest {
 
-    @MockBean JwtTokenProvider         jwtTokenProvider;       // JwtProperties 없이 JwtAuthenticationFilter 생성 가능하게 함
-    @MockBean CustomUserDetailsService customUserDetailsService; // JwtAuthenticationFilter + SecurityConfig 주입 해결
-    @MockBean AccountService           accountService;
+    @MockitoBean JwtTokenProvider         jwtTokenProvider;       // JwtProperties 없이 JwtAuthenticationFilter 생성 가능하게 함
+    @MockitoBean CustomUserDetailsService customUserDetailsService; // JwtAuthenticationFilter + SecurityConfig 주입 해결
+    @MockitoBean AccountService           accountService;
 
     @Autowired MockMvc      mockMvc;
     @Autowired ObjectMapper objectMapper;

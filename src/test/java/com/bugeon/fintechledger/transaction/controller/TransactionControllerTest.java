@@ -20,10 +20,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
@@ -39,13 +40,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(TransactionController.class)
+@ActiveProfiles("test")
 @AutoConfigureMockMvc(addFilters = false)
 @DisplayName("TransactionController")
 class TransactionControllerTest {
 
-    @MockBean JwtTokenProvider         jwtTokenProvider;
-    @MockBean CustomUserDetailsService customUserDetailsService;
-    @MockBean TransactionService       transactionService;
+    @MockitoBean JwtTokenProvider         jwtTokenProvider;
+    @MockitoBean CustomUserDetailsService customUserDetailsService;
+    @MockitoBean TransactionService       transactionService;
 
     @Autowired MockMvc      mockMvc;
     @Autowired ObjectMapper objectMapper;
@@ -111,6 +113,33 @@ class TransactionControllerTest {
                                     new DepositRequest(accountId, BigDecimal.ZERO, "KRW", null))))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.success").value(false));
+        }
+
+        @Test
+        @DisplayName("400 — 소수 셋째 자리 금액")
+        void deposit_400_too_many_fraction_digits() throws Exception {
+            mockMvc.perform(post("/api/v1/transactions/deposit")
+                            .with(user(principal))
+                            .header("Idempotency-Key", IDEM_KEY)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(
+                                    new DepositRequest(accountId, new BigDecimal("10.005"), "USD", null))))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.code").value("GEN_001"))
+                    .andExpect(jsonPath("$.error.details.amount").exists());
+        }
+
+        @Test
+        @DisplayName("400 — 지원하지 않는 통화")
+        void deposit_400_unsupported_currency() throws Exception {
+            mockMvc.perform(post("/api/v1/transactions/deposit")
+                            .with(user(principal))
+                            .header("Idempotency-Key", IDEM_KEY)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(
+                                    new DepositRequest(accountId, new BigDecimal("100"), "JPY", null))))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error.details.currency").exists());
         }
 
         @Test
@@ -348,6 +377,6 @@ class TransactionControllerTest {
 
     private TransactionResponse txResponse(TransactionType type, UUID fromId, UUID toId, String amount) {
         return new TransactionResponse(txId, type, TransactionStatus.SUCCESS,
-                fromId, toId, new BigDecimal(amount), "KRW", null, Instant.now());
+                fromId, toId, new BigDecimal(amount), "KRW", null, null, null, Instant.now(), Instant.now());
     }
 }

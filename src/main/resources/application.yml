@@ -42,20 +42,21 @@ spring:
     out-of-order: false
 
   # ── Redis ────────────────────────────────────────────────────────────────────
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:changeme_local}
-      timeout: 2000ms
-      lettuce:
-        pool:
-          max-active: 16
-          max-idle: 8
-          min-idle: 2
-          max-wait: 1000ms
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:29092}
+    producer:
+      acks: all
+      properties:
+        enable.idempotence: true
+        delivery.timeout.ms: 10000
+        request.timeout.ms: 5000
+        max.block.ms: 5000
 
-  # ── Jackson ──────────────────────────────────────────────────────────────────
+  task:
+    scheduling:
+      pool:
+        size: 4             # outbox relay, stale-claim release, reconciliation and token purge run independently
+
   jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -80,16 +81,12 @@ jwt:
   refresh-expiry-ms: ${JWT_REFRESH_EXPIRY_MS:604800000}
 
 # ── Idempotency ──────────────────────────────────────────────────────────────
-idempotency:
-  ttl-seconds: ${IDEMPOTENCY_TTL_SECONDS:86400}
-  processing-ttl-seconds: ${IDEMPOTENCY_PROCESSING_TTL_SECONDS:30}
-
-# ── Outbox ───────────────────────────────────────────────────────────────────
 outbox:
-  poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:5000}
-  max-retries: ${OUTBOX_MAX_RETRIES:5}
+  publisher: ${OUTBOX_PUBLISHER:log}            # kafka | log
+  topic: ${OUTBOX_TOPIC:ledger.transaction-events}
+  poll-interval-ms: ${OUTBOX_POLL_INTERVAL_MS:1000}
+  max-retries: ${OUTBOX_MAX_RETRIES:8}
 
-# ── Actuator ─────────────────────────────────────────────────────────────────
 management:
   endpoints:
     web:

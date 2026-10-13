@@ -4,6 +4,7 @@ import com.bugeon.fintechledger.auth.security.UserPrincipal;
 import com.bugeon.fintechledger.common.exception.BusinessException;
 import com.bugeon.fintechledger.common.exception.ErrorCode;
 import com.bugeon.fintechledger.common.web.ApiResponse;
+import com.bugeon.fintechledger.common.web.PageResponse;
 import com.bugeon.fintechledger.transaction.dto.DepositRequest;
 import com.bugeon.fintechledger.transaction.dto.TransactionResponse;
 import com.bugeon.fintechledger.transaction.dto.TransferRequest;
@@ -15,7 +16,6 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -24,6 +24,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -44,6 +45,9 @@ import java.util.UUID;
 @Tag(name = "Transactions", description = "입출금 및 송금 처리")
 @SecurityRequirement(name = "bearerAuth")
 public class TransactionController {
+
+    private static final Set<String> SORTABLE_PROPERTIES =
+            Set.of("createdAt", "completedAt", "amount", "status", "type");
 
     private final TransactionService transactionService;
 
@@ -91,13 +95,19 @@ public class TransactionController {
 
     @GetMapping
     @Operation(summary = "거래 내역 조회", description = "계좌의 거래 내역을 페이지 단위로 조회합니다.")
-    public ResponseEntity<ApiResponse<Page<TransactionResponse>>> getTransactions(
+    public ResponseEntity<ApiResponse<PageResponse<TransactionResponse>>> getTransactions(
             @RequestParam UUID accountId,
             @AuthenticationPrincipal UserPrincipal principal,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.ok(
-                transactionService.getTransactions(accountId, principal, pageable)));
+        pageable.getSort().forEach(order -> {
+            if (!SORTABLE_PROPERTIES.contains(order.getProperty())) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR,
+                        "Unsupported sort property: " + order.getProperty());
+            }
+        });
+        return ResponseEntity.ok(ApiResponse.ok(PageResponse.of(
+                transactionService.getTransactions(accountId, principal, pageable))));
     }
 
     @GetMapping("/by-idempotency-key/{idempotencyKey}")

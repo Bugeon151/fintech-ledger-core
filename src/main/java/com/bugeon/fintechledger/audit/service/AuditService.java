@@ -14,8 +14,9 @@ import java.util.UUID;
 /**
  * 감사 로그 서비스.
  *
- * Propagation.REQUIRES_NEW: 비즈니스 트랜잭션이 롤백되어도 감사 로그는 커밋된다.
- * 실패한 거래도 반드시 추적해야 하기 때문이다.
+ * - 성공 기록(REQUIRED): 비즈니스 트랜잭션에 참여한다. 돈의 이동과 감사 기록이 함께 커밋되거나
+ *   함께 롤백되므로 "감사 없는 이동"도, "일어나지 않은 일의 성공 감사"도 생기지 않는다.
+ * - 실패 기록(REQUIRES_NEW): 비즈니스 트랜잭션이 롤백되어도 독립적으로 커밋된다.
  */
 @Service
 @RequiredArgsConstructor
@@ -24,34 +25,23 @@ public class AuditService {
 
     private final AuditLogRepository auditLogRepository;
 
-    /**
-     * 성공한 거래 감사 로그.
-     * REQUIRES_NEW: 별도 트랜잭션으로 즉시 커밋.
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional
     public void logSuccess(AuditAction action,
                            UUID actorId, String actorEmail,
                            String targetType, UUID targetId,
                            String contextJson) {
-        AuditLog log = AuditLog.success(action, actorId, actorEmail,
-                targetType, targetId, contextJson, null, null);
-        auditLogRepository.save(log);
-        this.log.debug("Audit SUCCESS: action={} actor={} target={}/{}",
-                action, actorId, targetType, targetId);
+        auditLogRepository.save(AuditLog.success(action, actorId, actorEmail,
+                targetType, targetId, contextJson, null, null));
+        log.debug("Audit SUCCESS: action={} actor={} target={}/{}", action, actorId, targetType, targetId);
     }
 
-    /**
-     * 실패한 거래 감사 로그.
-     * REQUIRES_NEW: 비즈니스 TX 롤백과 무관하게 커밋.
-     */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logFailure(AuditAction action,
                            UUID actorId, String actorEmail,
                            String targetType, UUID targetId,
                            String contextJson) {
-        AuditLog auditLog = AuditLog.failure(action, actorId, actorEmail,
-                targetType, targetId, contextJson, null, null);
-        auditLogRepository.save(auditLog);
+        auditLogRepository.save(AuditLog.failure(action, actorId, actorEmail,
+                targetType, targetId, contextJson, null, null));
         log.debug("Audit FAILURE: action={} actor={}", action, actorId);
     }
 }
