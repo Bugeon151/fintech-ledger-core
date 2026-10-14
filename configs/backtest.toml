@@ -1,4 +1,0 @@
-mode = "backtest"
-data_source = "event_replay"
-broker = "backtest"
-fill_model = "L2"

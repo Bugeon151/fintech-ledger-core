@@ -1,5 +1,0 @@
-symbol = "BTCUSDT"
-venue = "binance_futures"
-product = "USDT-M_PERPETUAL"
-reference_spot_venues = ["binance_spot", "coinbase_spot"]
-
